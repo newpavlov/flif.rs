@@ -1,3 +1,6 @@
+extern crate failure;
+#[macro_use]
+extern crate failure_derive;
 extern crate inflate;
 extern crate num_traits;
 

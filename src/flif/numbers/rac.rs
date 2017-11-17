@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::io;
 use std::io::Read;
 use std::io::Write;
-use error::*;
 use super::FlifReadExt;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
@@ -172,16 +171,16 @@ impl<RW> Rac<RW> {
 }
 
 impl<R: Read> Rac<R> {
-    pub fn from_reader(mut reader: R) -> Result<Rac<R>> {
+    pub fn from_reader(mut reader: R) -> io::Result<Rac<R>> {
         // calculate the number of iterations needed to calculate low. The number of iterations
         // should be Self::MAX_RANGE_BITS / 8 rounded up
         let needed_iterations =
             (Self::MAX_RANGE_BITS / 8) + if Self::MAX_RANGE_BITS % 8 > 0 { 1 } else { 0 };
 
-        let low = (0..needed_iterations).fold(Ok(0), |acc: Result<u32>, _| {
+        let low = (0..needed_iterations).fold(Ok(0), |acc: io::Result<u32>, _| {
             let or_val = match reader.read_u8() {
                 Ok(val) => val,
-                Err(Error::Io(ref io)) if io.kind() == io::ErrorKind::UnexpectedEof => 0xFF,
+                Err(ref io) if io.kind() == io::ErrorKind::UnexpectedEof => 0xFF,
                 err => err?,
             };
             acc.map(|acc| (acc << 8) | or_val as u32)
@@ -194,7 +193,7 @@ impl<R: Read> Rac<R> {
         })
     }
 
-    fn input(&mut self) -> Result<()> {
+    fn input(&mut self) -> io::Result<()> {
         for _ in 0..2 {
             if self.range <= Self::MIN_RANGE {
                 self.low <<= 8;
@@ -202,7 +201,7 @@ impl<R: Read> Rac<R> {
 
                 self.low |= match self.reader.read_u8() {
                     Ok(val) => val,
-                    Err(Error::Io(ref io)) if io.kind() == io::ErrorKind::UnexpectedEof => 0xFF,
+                    Err(ref io) if io.kind() == io::ErrorKind::UnexpectedEof => 0xFF,
                     err => err?,
                 } as u32;
             }
@@ -210,7 +209,7 @@ impl<R: Read> Rac<R> {
         Ok(())
     }
 
-    fn get(&mut self, chance: u32) -> Result<bool> {
+    fn get(&mut self, chance: u32) -> io::Result<bool> {
         assert!(chance < self.range);
 
         if self.low >= self.range - chance {
@@ -225,18 +224,18 @@ impl<R: Read> Rac<R> {
         }
     }
 
-    pub fn read_bit(&mut self) -> Result<bool> {
+    pub fn read_bit(&mut self) -> io::Result<bool> {
         // creates a 50% chance
         let chance = self.range >> 1;
         self.get(chance)
     }
 
-    pub fn read_chance(&mut self, chance: u32) -> Result<bool> {
+    pub fn read_chance(&mut self, chance: u32) -> io::Result<bool> {
         let chance = Self::apply_chance(chance, self.range);
         self.get(chance)
     }
 
-    pub fn read(&mut self, context: &mut ChanceTable, entry: ChanceTableEntry) -> Result<bool> {
+    pub fn read(&mut self, context: &mut ChanceTable, entry: ChanceTableEntry) -> io::Result<bool> {
         let chance = context.get_chance(entry);
         let bit = self.get(chance as u32)?;
         context.update_entry(bit, entry);
@@ -254,7 +253,7 @@ impl<W: Write> Rac<W> {
         }
     }
 
-    fn output(&mut self) -> Result<()> {
+    fn output(&mut self) -> io::Result<()> {
         if self.range <= Self::MIN_RANGE {
             // write out the top 8 bits of low
             let byte = (self.low >> Self::MIN_RANGE_BITS) as u8;
@@ -266,7 +265,7 @@ impl<W: Write> Rac<W> {
         Ok(())
     }
 
-    fn set(&mut self, chance: u32, bit: bool) -> Result<()> {
+    fn set(&mut self, chance: u32, bit: bool) -> io::Result<()> {
         if bit {
             self.low += self.range - chance;
             self.range = chance;
@@ -279,17 +278,17 @@ impl<W: Write> Rac<W> {
         Ok(())
     }
 
-    pub fn write_bit(&mut self, bit: bool) -> Result<()> {
+    pub fn write_bit(&mut self, bit: bool) -> io::Result<()> {
         let chance = self.range >> 1;
         self.set(chance, bit)
     }
 
-    pub fn write_chance(&mut self, chance: u32, bit: bool) -> Result<()> {
+    pub fn write_chance(&mut self, chance: u32, bit: bool) -> io::Result<()> {
         let chance = Self::apply_chance(chance, self.range);
         self.set(chance, bit)
     }
 
-    pub fn flush(&mut self) -> Result<()> {
+    pub fn flush(&mut self) -> io::Result<()> {
         // flush is only ever required if there is data in the top 8 bits (out of 24) of low.
         if self.low >> Self::MIN_RANGE_BITS > 0 {
             let byte = (self.low >> Self::MIN_RANGE_BITS) as u8;

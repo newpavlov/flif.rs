@@ -1,5 +1,4 @@
-use std::io::Read;
-use error::*;
+use std::io::{self, Read};
 use num_traits::{PrimInt, Signed};
 use numbers::rac::ChanceTable;
 use numbers::rac::ChanceTableEntry;
@@ -11,7 +10,7 @@ pub trait NearZeroCoder {
         min: I,
         max: I,
         context: &mut ChanceTable,
-    ) -> Result<I>;
+    ) -> io::Result<I>;
 }
 
 impl<R: Read> NearZeroCoder for Rac<R> {
@@ -20,10 +19,8 @@ impl<R: Read> NearZeroCoder for Rac<R> {
         min: I,
         max: I,
         context: &mut ChanceTable,
-    ) -> Result<I> {
-        if min > max {
-            return Err(Error::Unimplemented("something"));
-        }
+    ) -> io::Result<I> {
+        assert!(min <= max);
 
         if min == max {
             return Ok(min);

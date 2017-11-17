@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{self, Read};
 use error::*;
 use numbers::FlifReadExt;
 use numbers::rac::Rac;
@@ -38,9 +38,7 @@ impl Header {
         reader.read_exact(&mut magic_buf)?;
 
         if &magic_buf != b"FLIF" {
-            return Err(Error::InvalidHeader {
-                desc: "file is corrupt or not a FLIF",
-            });
+            return Err(Error::InvalidHeader("file is corrupt or not a FLIF"));
         }
 
         let flags = reader.read_u8()?;
@@ -49,9 +47,9 @@ impl Header {
             flag @ 3...4 => (flag == 4, false),
             flag @ 5...6 => (flag == 6, true),
             _ => {
-                return Err(Error::InvalidHeader {
-                    desc: "interlacing/animation bits not valid",
-                })
+                return Err(Error::InvalidHeader(
+                    "interlacing/animation bits not valid",
+                ))
             }
         };
 
@@ -60,9 +58,7 @@ impl Header {
             3 => Channels::RGB,
             4 => Channels::RGBA,
             _ => {
-                return Err(Error::InvalidHeader {
-                    desc: "invalid number of channels",
-                })
+                return Err(Error::InvalidHeader ("invalid number of channels"));
             }
         };
 
@@ -71,9 +67,7 @@ impl Header {
             1 => BytesPerChannel::One,
             2 => BytesPerChannel::Two,
             _ => {
-                return Err(Error::InvalidHeader {
-                    desc: "bytes per channel was not a valid value",
-                })
+                return Err(Error::InvalidHeader("bytes per channel was not a valid value"))
             }
         };
         let width = 1 + reader.read_varint::<u32>()?;
@@ -119,7 +113,7 @@ impl SecondHeader {
                 BytesPerChannel::Two => Ok(16),
                 BytesPerChannel::Custom => rac.read_val(1, 16),
             })
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<io::Result<Vec<_>>>()?;
 
         let alpha_zero = if main_header.channels == Channels::RGBA {
             rac.read_bool()?
@@ -136,7 +130,7 @@ impl SecondHeader {
         let frame_delay = if main_header.animated {
             Some((0..main_header.num_frames)
                 .map(|_| rac.read_val(0, 60_000))
-                .collect::<Result<Vec<_>>>()?)
+                .collect::<io::Result<Vec<_>>>()?)
         } else {
             None
         };
