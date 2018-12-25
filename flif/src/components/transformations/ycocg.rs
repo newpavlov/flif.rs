@@ -6,10 +6,11 @@ use components::transformations::ColorRange;
 pub struct YCoGg {
     max: i16,
     alpha_range: ColorRange,
+    previous_transformation: Box<Transform>,
 }
 
 impl YCoGg {
-    pub fn new<T: Transform>(transformation: T) -> YCoGg {
+    pub fn new(transformation: Box<Transform>) -> YCoGg {
         let max_iter = [
             transformation.range(Channel::Red).max,
             transformation.range(Channel::Blue).max,
@@ -21,6 +22,7 @@ impl YCoGg {
         YCoGg {
             max: new_max,
             alpha_range: transformation.range(Channel::Alpha),
+            previous_transformation: transformation,
         }
     }
 }
@@ -36,6 +38,7 @@ impl Transform for YCoGg {
         pixel[Channel::Red] = red;
         pixel[Channel::Green] = green;
         pixel[Channel::Blue] = blue;
+        self.previous_transformation.undo(pixel);
     }
 
     fn range(&self, channel: Channel) -> ColorRange {
